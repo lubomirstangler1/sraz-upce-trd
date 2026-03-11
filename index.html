@@ -5,69 +5,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sraz UPCE TŘD – 20 let</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-body{
-font-family: Arial, sans-serif;
-margin:0;
-background:#f5f5f5;
-}
-header{
-background:#2c3e50;
-color:white;
-padding:20px;
-text-align:center;
-}
-nav{
-display:flex;
-justify-content:center;
-background:#34495e;
-}
-nav button{
-background:none;
-border:none;
-color:white;
-padding:15px 20px;
-cursor:pointer;
-font-size:16px;
-}
-nav button:hover{
-background:#2c3e50;
-}
-section{
-display:none;
-padding:20px;
-max-width:800px;
-margin:auto;
-background:white;
-margin-top:20px;
-border-radius:8px;
-}
-section.active{
-display:block;
-}
-button.answer{
-margin:5px;
-padding:12px 20px;
-font-size:16px;
-cursor:pointer;
-}
-input, textarea{
-width:100%;
-padding:10px;
-margin:5px 0 10px 0;
-}
-.chat-box{
-border:1px solid #ccc;
-height:250px;
-overflow-y:auto;
-padding:10px;
-margin-bottom:10px;
-background:#fafafa;
-}
-.response{
-padding:5px 0;
-border-bottom:1px solid #eee;
-}
+body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f2f2f2}
+header{background:#2c3e50;color:white;text-align:center;padding:20px}
+nav{display:flex;justify-content:center;background:#34495e}
+nav button{background:none;border:none;color:white;padding:14px 20px;font-size:16px;cursor:pointer}
+nav button:hover{background:#2c3e50}
+section{display:none;max-width:900px;margin:20px auto;background:white;padding:20px;border-radius:8px}
+section.active{display:block}
+input,textarea{width:100%;padding:10px;margin:6px 0}
+button.vote{padding:12px 18px;margin:5px;font-size:16px;cursor:pointer}
+#responses div{padding:6px;border-bottom:1px solid #eee}
+.chatbox{border:1px solid #ddd;height:250px;overflow-y:auto;padding:10px;background:#fafafa;margin-bottom:10px}
 </style>
 </head>
 
@@ -79,41 +29,41 @@ border-bottom:1px solid #eee;
 </header>
 
 <nav>
-<button onclick="showTab('ucast')">Účast</button>
-<button onclick="showTab('chat')">Chat</button>
-<button onclick="showTab('program')">Program</button>
+<button onclick="tab('ucast')">Účast</button>
+<button onclick="tab('chat')">Chat</button>
+<button onclick="tab('program')">Program</button>
 </nav>
 
 <section id="ucast" class="active">
 <h2>Potvrzení účasti</h2>
 
-<label>Jméno:</label>
-<input id="nameInput">
+<label>Jméno</label>
+<input id="name">
 
 <div>
-<button class="answer" onclick="vote('Ano')">Ano</button>
-<button class="answer" onclick="vote('Ne')">Ne</button>
-<button class="answer" onclick="vote('Ještě nevím')">Ještě nevím</button>
+<button class="vote" onclick="vote('Ano')">Ano</button>
+<button class="vote" onclick="vote('Ne')">Ne</button>
+<button class="vote" onclick="vote('Ještě nevím')">Ještě nevím</button>
 </div>
 
-<h3>Odpovědi:</h3>
+<h3>Statistika</h3>
+<canvas id="chart"></canvas>
+
+<h3>Seznam odpovědí</h3>
 <div id="responses"></div>
 </section>
-
 
 <section id="chat">
 <h2>Chat</h2>
 
-<label>Jméno:</label>
+<label>Jméno</label>
 <input id="chatName">
 
-<div class="chat-box" id="chatBox"></div>
+<div class="chatbox" id="chatbox"></div>
 
-<textarea id="chatMessage" placeholder="Napiš zprávu..."></textarea>
-<button onclick="sendMessage()">Odeslat</button>
-
+<textarea id="msg" placeholder="Napiš zprávu"></textarea>
+<button onclick="send()">Odeslat</button>
 </section>
-
 
 <section id="program">
 <h2>Program</h2>
@@ -122,92 +72,113 @@ border-bottom:1px solid #eee;
 
 <script>
 
-function showTab(id){
-document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
-document.getElementById(id).classList.add("active");
+function tab(id){
+document.querySelectorAll("section").forEach(s=>s.classList.remove("active"))
+document.getElementById(id).classList.add("active")
 }
 
-function vote(answer){
-
-let name=document.getElementById("nameInput").value.trim();
-if(!name){
-alert("Vyplň jméno.");
-return;
+function getData(){
+return JSON.parse(localStorage.getItem("responses")||"[]")
 }
 
-let responses=JSON.parse(localStorage.getItem("responses")||"[]");
-
-responses.push({
-name:name,
-answer:answer,
-time:new Date().toLocaleString()
-});
-
-localStorage.setItem("responses",JSON.stringify(responses));
-
-renderResponses();
+function saveData(d){
+localStorage.setItem("responses",JSON.stringify(d))
 }
 
-function renderResponses(){
+function vote(ans){
 
-let responses=JSON.parse(localStorage.getItem("responses")||"[]");
+let name=document.getElementById("name").value.trim()
+if(!name){alert("Vyplň jméno");return}
 
-let container=document.getElementById("responses");
-container.innerHTML="";
-
-responses.forEach(r=>{
-let div=document.createElement("div");
-div.className="response";
-div.textContent=r.name+" – "+r.answer;
-container.appendChild(div);
-});
+let data=getData()
+data.push({name:name,answer:ans})
+saveData(data)
+render()
 }
 
-function sendMessage(){
+function render(){
 
-let name=document.getElementById("chatName").value.trim();
-let message=document.getElementById("chatMessage").value.trim();
+let data=getData()
+let r=document.getElementById("responses")
+r.innerHTML=""
 
-if(!name || !message){
-alert("Vyplň jméno i zprávu.");
-return;
+let a=0,n=0,j=0
+
+data.forEach(x=>{
+
+if(x.answer=="Ano")a++
+if(x.answer=="Ne")n++
+if(x.answer=="Ještě nevím")j++
+
+let d=document.createElement("div")
+d.textContent=x.name+" – "+x.answer
+r.appendChild(d)
+
+})
+
+draw(a,n,j)
 }
 
-let chat=JSON.parse(localStorage.getItem("chat")||"[]");
+let chart
 
-chat.push({
-name:name,
-message:message,
-time:new Date().toLocaleTimeString()
-});
+function draw(a,n,j){
 
-localStorage.setItem("chat",JSON.stringify(chat));
+let ctx=document.getElementById("chart")
 
-document.getElementById("chatMessage").value="";
+if(chart)chart.destroy()
 
-renderChat();
+chart=new Chart(ctx,{
+type:"bar",
+data:{
+labels:["Ano","Ne","Ještě nevím"],
+datasets:[{data:[a,n,j]}]
+},
+options:{plugins:{legend:{display:false}}}
+})
+}
+
+function chatData(){
+return JSON.parse(localStorage.getItem("chat")||"[]")
+}
+
+function saveChat(d){
+localStorage.setItem("chat",JSON.stringify(d))
+}
+
+function send(){
+
+let name=document.getElementById("chatName").value.trim()
+let msg=document.getElementById("msg").value.trim()
+
+if(!name||!msg){alert("Vyplň jméno i zprávu");return}
+
+let c=chatData()
+c.push({name:name,msg:msg,time:new Date().toLocaleTimeString()})
+saveChat(c)
+
+document.getElementById("msg").value=""
+renderChat()
 }
 
 function renderChat(){
 
-let chat=JSON.parse(localStorage.getItem("chat")||"[]");
+let c=chatData()
+let box=document.getElementById("chatbox")
+box.innerHTML=""
 
-let box=document.getElementById("chatBox");
-box.innerHTML="";
+c.forEach(m=>{
 
-chat.forEach(m=>{
+let d=document.createElement("div")
+d.textContent="["+m.time+"] "+m.name+": "+m.msg
+box.appendChild(d)
 
-let div=document.createElement("div");
-div.textContent="["+m.time+"] "+m.name+": "+m.message;
-box.appendChild(div);
+})
 
-});
-
-box.scrollTop=box.scrollHeight;
+box.scrollTop=box.scrollHeight
 }
 
-renderResponses();
-renderChat();
+render()
+renderChat()
 
 </script>
 
